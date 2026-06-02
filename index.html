@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>工事安全 写真チェック - チーム版</title>
+    <title>現場写真安全チェック補助アプリ</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -212,37 +212,27 @@
 </head>
 <body>
     <div class="header">
-        <h1>🏗️ 工事安全 写真チェック</h1>
-        <div class="subtitle">2025年版 工事安全ルールブック準拠 / チーム共有版</div>
-        <div class="badge">✓ 完全無料 - Google Gemini AI</div>
+        <h1>🏗️ 現場写真安全チェック補助アプリ</h1>
+        <div class="subtitle">2025年版 工事安全ルールブック準拠</div>
+        <div class="badge">オンライン・スマートフォン対応</div>
     </div>
 
     <div class="container">
-        <!-- 設定セクション -->
+        <!-- 設定セクション（現場名のみ・任意） -->
         <div class="card" id="configCard">
             <div class="collapsible-header" onclick="toggleSection('configSection')">
-                <span>⚙️ 初期設定（APIキー）</span>
-                <span id="configArrow">▼</span>
+                <span>📍 現場名の設定（任意）</span>
+                <span id="configArrow">▶</span>
             </div>
             <div class="collapsible-content" id="configSection">
-                <div style="margin-bottom:12px">
-                    <label>Google Gemini API キー</label>
-                    <textarea id="apiKeys" placeholder="AIzaSy... (1行に1つ、複数入力可)"></textarea>
-                    <div class="help-text">
-                        📌 取得方法: <a href="https://aistudio.google.com/apikey" target="_blank" style="color:#2b6cb0">Google AI Studio</a> で無料発行<br>
-                        📌 チーム利用のため、複数キーを改行区切りで入力すると自動ローテーションします<br>
-                        📌 35名×10枚/日 = 350回/日 → 2つ以上のキー推奨（1キー250回/日制限）
-                    </div>
-                    <div id="keyCount" class="key-count" style="display:none"></div>
-                </div>
                 <div style="margin-bottom:12px">
                     <label>現場名（任意・記録用）</label>
                     <input type="text" id="siteName" placeholder="例：○○ビル新築工事">
                 </div>
-                <button class="btn-primary" onclick="saveConfig()">設定を保存</button>
+                <button class="btn-primary" onclick="saveConfig()">保存</button>
                 <div id="configStatus" class="config-status" style="display:none"></div>
                 <div class="team-info">
-                    👥 チーム35名共有 ｜ 設定は端末に保存され次回から不要です
+                    👥 チーム35名共有 ｜ APIキーは内蔵済み・入力不要
                 </div>
             </div>
         </div>
@@ -319,61 +309,33 @@
     </div>
 
     <script>
+    // ===== 内蔵 APIキー（チーム共有・入力不要） =====
+    // チーム利用回数が増えた場合は、ここに追加のキーをカンマ区切りで足してください。
+    // 例: const EMBEDDED_API_KEYS = ['AIza...1', 'AIza...2', 'AIza...3'];
+    const EMBEDDED_API_KEYS = [
+        'AIzaSyAb5TEy5WNCin4vBDYadDRt4ejlgGhvjQs'
+    ];
+
     // ===== 設定管理 =====
-    const CONFIG_KEY = 'safety_checker_gemini_v1';
+    const CONFIG_KEY = 'safety_checker_gemini_v2';
     let selectedImages = [];
+    let keyRotationIndex = 0;
 
     function loadConfig() {
         const saved = localStorage.getItem(CONFIG_KEY);
         if (saved) {
             const config = JSON.parse(saved);
-            document.getElementById('apiKeys').value = (config.apiKeys || []).join('\n');
             document.getElementById('siteName').value = config.siteName || '';
-            updateKeyCount(config.apiKeys || []);
-            showConfigStatus(true);
-            if (config.apiKeys && config.apiKeys.length > 0) {
-                document.getElementById('configSection').classList.remove('open');
-                document.getElementById('configArrow').textContent = '▶';
-            } else {
-                document.getElementById('configSection').classList.add('open');
-                document.getElementById('configArrow').textContent = '▼';
-            }
-        } else {
-            document.getElementById('configSection').classList.add('open');
-            document.getElementById('configArrow').textContent = '▼';
         }
+        // 設定セクションは初期状態で折りたたみ（APIキー入力が不要になったため）
+        document.getElementById('configSection').classList.remove('open');
+        document.getElementById('configArrow').textContent = '▶';
     }
 
     function saveConfig() {
-        const rawKeys = document.getElementById('apiKeys').value.trim();
         const siteName = document.getElementById('siteName').value.trim();
-        const apiKeys = rawKeys.split('\n').map(k => k.trim()).filter(k => k.length > 0);
-
-        if (apiKeys.length === 0) {
-            showConfigStatus(false, 'APIキーを1つ以上入力してください');
-            return;
-        }
-        // 簡易バリデーション
-        const invalid = apiKeys.find(k => !k.startsWith('AIza'));
-        if (invalid) {
-            showConfigStatus(false, 'APIキーは "AIza..." で始まる文字列です。確認してください');
-            return;
-        }
-        localStorage.setItem(CONFIG_KEY, JSON.stringify({ apiKeys, siteName, keyIndex: 0 }));
-        updateKeyCount(apiKeys);
-        showConfigStatus(true, `${apiKeys.length}個のAPIキーを保存しました ✓`);
-        updateCheckButton();
-    }
-
-    function updateKeyCount(keys) {
-        const el = document.getElementById('keyCount');
-        if (keys.length > 0) {
-            el.style.display = 'block';
-            const dailyCapacity = keys.length * 250;
-            el.textContent = `🔑 ${keys.length}キー登録済み → 1日あたり約${dailyCapacity}回利用可能`;
-        } else {
-            el.style.display = 'none';
-        }
+        localStorage.setItem(CONFIG_KEY, JSON.stringify({ siteName }));
+        showConfigStatus(true, '現場名を保存しました ✓');
     }
 
     function showConfigStatus(ok, msg) {
@@ -385,17 +347,18 @@
 
     function getConfig() {
         const saved = localStorage.getItem(CONFIG_KEY);
-        return saved ? JSON.parse(saved) : null;
+        const base = saved ? JSON.parse(saved) : {};
+        // APIキーは常に内蔵キーを使用
+        base.apiKeys = EMBEDDED_API_KEYS;
+        return base;
     }
 
-    // APIキーのローテーション（レート制限対策）
+    // APIキーのローテーション（レート制限対策・複数キー登録時）
     function getNextApiKey() {
-        const config = getConfig();
-        if (!config || !config.apiKeys || config.apiKeys.length === 0) return null;
-        const idx = (config.keyIndex || 0) % config.apiKeys.length;
-        config.keyIndex = idx + 1;
-        localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-        return config.apiKeys[idx];
+        if (!EMBEDDED_API_KEYS || EMBEDDED_API_KEYS.length === 0) return null;
+        const idx = keyRotationIndex % EMBEDDED_API_KEYS.length;
+        keyRotationIndex = idx + 1;
+        return EMBEDDED_API_KEYS[idx];
     }
 
     // ===== セクション開閉 =====
@@ -445,8 +408,8 @@
 
     function updateCheckButton() {
         const btn = document.getElementById('checkBtn');
-        const config = getConfig();
-        btn.disabled = !(selectedImages.length > 0 && config && config.apiKeys && config.apiKeys.length > 0);
+        // APIキーは内蔵済みなので、写真が選択されていれば実行可能
+        btn.disabled = !(selectedImages.length > 0);
     }
 
     // ===== 画像をBase64に変換 =====
@@ -474,8 +437,8 @@
     // ===== 安全チェック実行 =====
     async function runSafetyCheck() {
         const config = getConfig();
-        if (!config || !config.apiKeys || config.apiKeys.length === 0) {
-            alert('先にAPIキーの設定を行ってください');
+        if (!EMBEDDED_API_KEYS || EMBEDDED_API_KEYS.length === 0) {
+            alert('APIキーが内蔵されていません。管理者に連絡してください。');
             return;
         }
         if (selectedImages.length === 0) {
@@ -510,7 +473,7 @@
             // Gemini API 呼び出し（ローテーション付きリトライ）
             let result = null;
             let lastError = null;
-            const maxRetries = Math.min(config.apiKeys.length, 3);
+            const maxRetries = Math.min(EMBEDDED_API_KEYS.length, 3);
 
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 const apiKey = getNextApiKey();
